@@ -1,0 +1,4 @@
+HPCG benchmark input file
+ASU Sol - 60 A100 nodes x 4 GPU = 240 GPUs
+256 256 256
+1800

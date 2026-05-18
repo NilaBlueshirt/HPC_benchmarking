@@ -1,0 +1,30 @@
+benchmark,gpu_count,priority,N_or_local,NB,P,Q,extra,expected_score,note
+HPL,240 A100,1,1490048,448,15,16,,~2.62e6 GF,Reproduce known best as baseline / warm-up
+HPL,240 A100,1,1490048,416,15,16,,~2.6e6 GF,Untested NB between 384 and 448 — most likely to beat 448
+HPL,240 A100,1,1490048,480,15,16,,~2.6e6 GF,Untested NB between 448 and 512 — second-most likely
+HPL,240 A100,2,1487616,448,15,16,,~2.6e6 GF,N micro-sweep at winning NB (1024-aligned-ish: 1487616 = 3324*448)
+HPL,240 A100,2,1492736,448,15,16,,~2.6e6 GF,N micro-sweep at winning NB (3332*448)
+HPL,240 A100,2,1497088,448,15,16,,~2.6e6 GF,Slightly higher N — risk OOM but uses more HBM
+HPL,240 A100,3,1490048,432,15,16,,~2.55e6 GF,Even-finer NB granularity if 416/448/480 are within 0.5%
+HPL,240 A100,3,1490048,464,15,16,,~2.55e6 GF,Even-finer NB granularity (mirror of 432)
+HPL,240 A100,3,1474560,448,15,16,,~2.55e6 GF,Lower-mem N at winning NB — should be safer thermally
+HPL,240 A100,2,1505280,448,15,16,,~2.55e6 GF,N right-shoulder probe at winning NB — closes upper-right gap
+HPL,240 A100,3,1520640,448,15,16,,~2.5e6 GF,Further-right N at winning NB — outer bound on right shoulder
+HPL-MxP,240 A100,1,1490048,2048,15,16,niter=50,~5-7e6 GF,NVIDIA-recommended NB for HPL-MxP — first shot
+HPL-MxP,240 A100,1,1490048,1024,15,16,niter=50,~5-6e6 GF,Conservative MxP NB — compare vs 2048
+HPL-MxP,240 A100,1,1490048,4096,15,16,niter=50,~5-7e6 GF,Aggressive MxP NB — sometimes wins on tensor cores
+HPL-MxP,240 A100,2,1490048,448,15,16,niter=50,unknown,Curiosity: see if Sol's HPL NB-448 surprise carries to MxP
+HPL-MxP,240 A100,2,1490048,512,15,16,niter=50,unknown,MxP at small-NB regime — bracket the 448 probe
+HPL-MxP,240 A100,2,1525824,2048,15,16,niter=50,~5-7e6 GF,Higher N at best NB — HPL-MxP has less working-mem overhead so push N up ~2%
+HPL-MxP,240 A100,2,1525824,1024,15,16,niter=50,~5-7e6 GF,Right-shoulder probe at conservative NB — completes 2D corner
+HPL-MxP,240 A100,2,1525824,4096,15,16,niter=50,~5-7e6 GF,Right-shoulder probe at aggressive NB — completes 2D corner
+HPL-MxP,240 A100,3,1490048,2048,15,16,niter=25,~5-7e6 GF,Halve niter — speedup if convergence is fast
+HPL-MxP,240 A100,3,1490048,2048,15,16,niter=100,~5-7e6 GF,Double niter — safety check that 50 is enough
+HPCG,240 A100,1,256x256x256,,,,rt=60,~0.5-1 TF,Smoke test — confirms launcher works (will print INVALID)
+HPCG,240 A100,1,256x256x256,,,,rt=1800,~0.7-1.2 TF,NVIDIA default local size — official submission length
+HPCG,240 A100,1,384x384x384,,,,rt=1800,~1.0-1.4 TF,Larger local — usually higher GF on A100 80GB
+HPCG,240 A100,2,448x448x448,,,,rt=1800,~1.1-1.5 TF,Push memory footprint — verify no host-side stall
+HPCG,240 A100,2,320x320x320,,,,rt=1800,~0.9-1.3 TF,Bracket between 256 and 384
+HPCG,240 A100,3,512x512x512,,,,rt=1800,~1.2-1.6 TF,Maximum cube that fits cleanly on 80 GB
+HPCG,240 A100,3,192x192x192,,,,rt=1800,~0.5-0.8 TF,Lower bound — quick to run, validates the curve
+HPCG,240 A100,3,640x640x640,,,,rt=1800,~1.3-1.6 TF,Confirm plateau above 512 — close memory headroom question

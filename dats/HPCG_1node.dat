@@ -1,0 +1,4 @@
+HPCG benchmark input file
+ASU Sol - 1 node x 4 A100 = 4 GPUs (smoke test)
+256 256 256
+60
