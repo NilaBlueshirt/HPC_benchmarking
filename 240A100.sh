@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH -J fine_Ns
+#SBATCH -J test
 #SBATCH --reservation=oct2026_maint
-#SBATCH -p hpl
+#SBATCH -p public
 #SBATCH -q public
 #SBATCH -t 0-8
 #SBATCH -C a100_80
-#SBATCH -N 60-60
+#SBATCH -N 2-2
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-task=1
 #SBATCH --gpus-per-node=4
@@ -21,7 +21,7 @@ echo "==========================================================================
 echo "---------------- HPL Run Start $(date) ------------------"
 echo ""
 
-DAT_FILE=$(readlink -f ./dats/240GPU_grid.dat)
+DAT_FILE=$(readlink -f ./dats/2nodes.dat)
 DAT_MOUNT="$(dirname "$DAT_FILE"):/my-dat-files"
 SIF=/packages/apps/simg/nvhpl_26.02.01.sif
 
