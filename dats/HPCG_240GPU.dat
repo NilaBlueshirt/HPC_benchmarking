@@ -1,4 +1,4 @@
 HPCG benchmark input file
-ASU Sol - 60 A100 nodes x 4 GPU = 240 GPUs
-256 256 256
+ASU Sol - 60 A100 80GB nodes x 4 GPU = 240 GPUs; line 3 is the LOCAL grid per GPU
+512 512 256
 1800

@@ -6,7 +6,7 @@ HPL.out      output file name (if any)
 263808       Ns         (229*1152; 8 x A100 80GB, ~87% HBM; best recorded 2-node run 1.318e5 GF)
 1            # of NBs
 1152         NBs
-0            PMAP process mapping (0=Row-,1=Column-major)
+1            PMAP process mapping (0=Row-,1=Column-major)
 1            # of process grids (P x Q)
 4            Ps
 2            Qs
