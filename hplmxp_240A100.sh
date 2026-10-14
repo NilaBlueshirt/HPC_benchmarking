@@ -4,14 +4,13 @@
 #SBATCH -p hpl
 #SBATCH -q public
 #SBATCH -t 0-8
-#SBATCH -C a100_80
 #SBATCH -N 60-60
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-task=1
 #SBATCH --gpus-per-node=4
 #SBATCH --gpu-bind=single:1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=0
+#SBATCH --mem=512000M
 #SBATCH -o hplmxp.log
 #SBATCH --open-mode=append
 #SBATCH --distribution=block:block
