@@ -1,0 +1,4 @@
+HPCG benchmark input file
+Sol bare-metal HPCG — 224 GPUs (56 nodes x 4 A100 80GB), 256^3 local, 1800s
+256 256 256
+1800

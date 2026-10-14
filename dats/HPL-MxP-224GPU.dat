@@ -1,0 +1,14 @@
+HPL-MxP benchmark input file
+Sol bare-metal HPL-MxP — 224 GPUs (56 nodes × 4 A100 80GB)
+HPL-MxP.out  output file name
+6            device out (6=stdout)
+1            # of problem sizes (N)
+1605632      Ns           # 7 * LCM(14,16) * 2048 = 7 * 229376 — clean 56 row-blocks, 49 col-blocks
+1            # of NBs
+2048         NBs          # NVIDIA-recommended NB for HPL-MxP on A100
+1            PMAP process mapping (0=Row-, 1=Column-major)
+1            # of process grids (P x Q)
+14           Ps
+16           Qs
+16.0         threshold
+50           # of refinement iterations

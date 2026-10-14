@@ -1,0 +1,31 @@
+HPLinpack benchmark input file
+Sol bare-metal HPL — 224 GPUs NB sweep
+HPL.out      output file name
+6            device out
+2            # of problem sizes
+1482624 1487616    Ns
+3            # of NBs
+416 352 384      NBs  
+1            PMAP (1=Column-major)
+1            # of process grids
+14           Ps
+16           Qs
+16.0         threshold
+1            # of panel fact
+1            PFACTs
+1            # of recursive stopping criterium
+2            NBMINs
+1            # of panels in recursion
+2            NDIVs
+1            # of recursive panel fact.
+1            RFACTs
+1            # of broadcast
+2            BCASTs
+1            # of lookahead depth
+1            DEPTHs
+1            SWAP
+192          swapping threshold
+1            L1 in (0=transposed)
+0            U  in (0=transposed)
+0            Equilibration
+8            memory alignment
