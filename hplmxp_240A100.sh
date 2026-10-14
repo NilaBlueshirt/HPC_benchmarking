@@ -23,12 +23,12 @@
 #       as fits on each GPU (leaving 3 GB free); the remainder, ~75 GB per node, sits in
 #       host RAM.  Without --fill-device the whole FP64 matrix would need ~295 GB/node.
 # NB    2048, NVIDIA's HPL-MxP example value.
-# Grid  15 x 16, the grid that won every 240-GPU HPL comparison (16 x 15 lost ~10%).
+# Grid  15 x 16 column-major: the grid and PMAP=1 ordering of the 2.815 PFlop/s HPL run (16 x 15 lost ~10%).
 N=1484800
 NB=2048
 NPROW=15
 NPCOL=16
-NPORDER=row
+NPORDER=column
 SIF=/packages/apps/simg/nvhpl_26.02.01.sif
 # -------------------------------------------------------------------------------
 
