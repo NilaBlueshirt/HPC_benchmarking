@@ -1,47 +1,54 @@
 #!/bin/bash
 #SBATCH -J hplmxp_240
-#SBATCH --reservation=maint
+#SBATCH --reservation=oct2026_maint
 #SBATCH -p hpl
 #SBATCH -q public
 #SBATCH -t 0-8
-#SBATCH -C a100_80
 #SBATCH -N 60-60
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-task=1
 #SBATCH --gpus-per-node=4
 #SBATCH --gpu-bind=single:1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=0
+#SBATCH --mem=512000M
 #SBATCH -o hplmxp.log
 #SBATCH --open-mode=append
 #SBATCH --distribution=block:block
 #SBATCH --export=NONE
 
+# ---- HPL-MxP parameters ------------------------------------------------------
+# hpl-mxp.sh takes command-line flags; it has no dat file (NVIDIA HPC-Benchmarks docs).
+# N     1484800 = 725 x 2048.  FP16 working copy on GPU = N^2 x 2 B / 240 = 18.4 GB/GPU.
+#       FP64 matrix = N^2 x 8 B = 17.6 TB total.  --fill-device 1 places as much of it
+#       as fits on each GPU (leaving 3 GB free); the remainder, ~75 GB per node, sits in
+#       host RAM.  Without --fill-device the whole FP64 matrix would need ~295 GB/node.
+# NB    2048, NVIDIA's HPL-MxP example value.
+# Grid  15 x 16 column-major: the grid and PMAP=1 ordering of the 2.815 PFlop/s HPL run (16 x 15 lost ~10%).
+N=1484800
+NB=2048
+NPROW=15
+NPCOL=16
+NPORDER=column
+SIF=/packages/apps/simg/nvhpl_26.02.01.sif
+# -------------------------------------------------------------------------------
+
 echo "==============================================================================="
 echo "---------------- HPL-MxP Run Start $(date) ------------------"
 echo ""
-
-DAT_FILE=$(readlink -f ./dats/HPL-MxP_240GPU.dat)
-DAT_MOUNT="$(dirname "$DAT_FILE"):/my-dat-files"
-SIF=/packages/apps/simg/nvhpl_25.09.sif
-
 echo "SBATCH script for JOB ${SLURM_JOB_ID} :"
 scontrol write batch_script $SLURM_JOB_ID - | grep -v '^ *echo '
 echo ""
-echo "Using DAT File: ${DAT_FILE}"
-cat ${DAT_FILE}
+echo "HPL-MxP params: N=$N NB=$NB grid=${NPROW}x${NPCOL} ${NPORDER}-major  SIF=$SIF"
 echo "Starting hpl-mxp container"
 
 mkdir -p myhplmxp
-cat > myhplmxp/run.sh <<EOF
+cat > myhplmxp/run.sh <<EOS
 #!/bin/bash
 HCA=\$(basename /sys/class/net/ib0/device/infiniband/* 2>/dev/null || ibdev2netdev | awk "/ ib0 /{print \$1; exit}")
 MAP=\${HCA}:1
-GPU_N=\${SLURM_GPUS_ON_NODE:-\$(nvidia-smi -L 2>/dev/null | wc -l || echo 4)}
-PE_MAP=\$(printf "%s," \$(yes "\$MAP" | head -n "\$GPU_N")); PE_MAP=\${PE_MAP%,}
 
 echo "SLURM_NNODES=$SLURM_NNODES SLURM_NTASKS=$SLURM_NTASKS NODELIST=$SLURM_JOB_NODELIST"
-echo "On node \$(hostname): SLURM_GPUS_ON_NODE=\$SLURM_GPUS_ON_NODE CUDA_VISIBLE_DEVICES=\$CUDA_VISIBLE_DEVICES PE_MAP=\$PE_MAP"
+echo "On node \$(hostname): SLURM_GPUS_ON_NODE=\$SLURM_GPUS_ON_NODE CUDA_VISIBLE_DEVICES=\$CUDA_VISIBLE_DEVICES"
 
 export OMP_NUM_THREADS=12
 export OMP_PROC_BIND=close
@@ -55,10 +62,6 @@ export UCX_NET_DEVICES=\$MAP
 export UCX_SOCKADDR_TLS_PRIORITY=rdmacm
 export UCX_POSIX_USE_PROC_LINK=n
 export UCX_IB_GDR_DIRECT_RDMA=y
-export NVSHMEM_REMOTE_TRANSPORT=ibrc
-export NVSHMEM_HCA_PE_MAPPING=\$PE_MAP
-export NVSHMEM_FORCE_IBGDA=1
-export NVSHMEM_DEBUG=WARN
 export NCCL_DEBUG=WARN
 export NCCL_NET=IB
 export NCCL_COLLNET_ENABLE=1
@@ -67,19 +70,19 @@ export NCCL_SOCKET_IFNAME=ib0
 export NCCL_IB_GID_INDEX=0
 export NCCL_IB_PCI_RELAXED_ORDERING=1
 export NCCL_CROSS_NIC=0
-export NCCL_P2P_DISABLE=1
-export MONITOR_GPU=1
-export GPU_TEMP_WARNING=80
-export GPU_CLOCK_WARNING=562
-/workspace/hpl-mxp.sh --dat "/my-dat-files/$(basename "$DAT_FILE")"
-EOF
+# NCCL_P2P_DISABLE is intentionally not set: HPL-MxP's panel broadcast runs on NCCL,
+# and the 16-GPU HPL test gained 7% when it was removed from the NCCL path.
+
+# --gpu-affinity 0:0:0:0 because --gpu-bind=single:1 makes each rank see its GPU as device 0.
+/workspace/hpl-mxp.sh --n $N --nb $NB --nprow $NPROW --npcol $NPCOL --nporder $NPORDER --gpu-affinity 0:0:0:0 --fill-device 1 --monitor-gpu 1 --monitor-gpu-temp-warning 80 --monitor-gpu-clock-warning 562
+EOS
 SCRIPT_FILE=$(readlink -f ./myhplmxp/run.sh)
 SCRIPT_MOUNT="$(dirname "$SCRIPT_FILE"):/myhplmxp"
 chmod +x $SCRIPT_FILE
 
 
 srun --mpi=pmix --export=ALL  -n $SLURM_NTASKS \
-    apptainer run --nv -B "${DAT_MOUNT}" -B "${SCRIPT_MOUNT}" "$SIF" /myhplmxp/run.sh
+    apptainer run --nv -B "${SCRIPT_MOUNT}" "$SIF" /myhplmxp/run.sh
 
 
 

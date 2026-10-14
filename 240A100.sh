@@ -1,17 +1,16 @@
 #!/bin/bash
-#SBATCH -J fine_Ns
-#SBATCH --reservation=maint
+#SBATCH -J 240-HPL-optimal-grid
+#SBATCH --reservation=oct2026_maint
 #SBATCH -p hpl
-#SBATCH -q public
+##SBATCH -q public
 #SBATCH -t 0-8
-#SBATCH -C a100_80
 #SBATCH -N 60-60
 #SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-task=1
 #SBATCH --gpus-per-node=4
 #SBATCH --gpu-bind=single:1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=0
+#SBATCH --mem=512000M
 #SBATCH -o hpl.log
 #SBATCH --open-mode=append
 #SBATCH --distribution=block:block
@@ -21,9 +20,9 @@ echo "==========================================================================
 echo "---------------- HPL Run Start $(date) ------------------"
 echo ""
 
-DAT_FILE=$(readlink -f ./dats/240GPU_grid.dat)
+DAT_FILE=$(readlink -f ./dats/HPL_240GPU.dat)
 DAT_MOUNT="$(dirname "$DAT_FILE"):/my-dat-files"
-SIF=/packages/apps/simg/nvhpl_25.09.sif
+SIF=/packages/apps/simg/nvhpl_26.02.01.sif
 
 echo "SBATCH script for JOB ${SLURM_JOB_ID} :"
 scontrol write batch_script $SLURM_JOB_ID - | grep -v '^ *echo '

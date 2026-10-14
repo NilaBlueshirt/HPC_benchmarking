@@ -1,0 +1,141 @@
+# Mixed A100 + H100 HPL on Sol
+
+Run files and procedure for adding the H100 nodes to the 240-A100 HPL run. Written for the
+Sol admin running the October 2026 window. Everything here runs on the cluster; nothing was
+executed there while writing it, so treat the first smoke test as the test of this guide too.
+
+## 1. Is there an alternative to the NVIDIA container for H100?
+
+Not a faster one. The NVIDIA HPC Benchmarks container (`nvhpl_25.09.sif`) is the HPL every
+H100 entry on the TOP500 uses, and it already works on your H100s: the single-node test in
+`hpl-score.csv` reached 45 TFlop/s per H100 with v25.09. What failed in May was the mixed
+252-GPU job, and that job ran with NVSHMEM off, `rc_x` instead of `dc_x` and no CUDA IPC,
+while the 8-GPU mixed pairs with the normal settings ran at full A100 speed. The problem to
+solve is the mixed job layout, not H100 support.
+
+Options, in the order worth trying:
+
+| Option | What changes | Cost in score |
+|---|---|---|
+| Same container, hetjob layout (`256mix.sh`, `260mix.sh`) | per-GPU HCA mapping on 8-way nodes, 240-run transport settings kept | none; this is the target |
+| Same container, NVSHMEM off (`MIX_NVSHMEM=0`) | HPL falls back to its NCCL/MPI path | a few percent on A100 in your May tests |
+| Other container release (`hpc-benchmarks:24.09`, `25.04`) | different NVSHMEM/UCX builds | none if it runs; pull with `apptainer pull docker://nvcr.io/nvidia/hpc-benchmarks:<tag>` |
+| netlib HPL 2.3 + NVBLAS (`alt/build_hpl_nvblas.sh`) | no NVSHMEM, NCCL or UCX at all; only DGEMM on the GPU | 3 to 5 times slower per GPU; cannot make the list; diagnostic only |
+
+## 2. Files
+
+| File | Purpose |
+|---|---|
+| `256mix.sh` | 240 A100 + 16 H100 (two 8-way nodes), 16x16 grid |
+| `260mix.sh` | 240 A100 + 20 H100 (two 8-way + one 4-way), 13x20 grid |
+| `mix_test12.sh` | 1 A100 node + 1 8-way node, 12 GPUs, 3x4, about 2 minutes of compute |
+| `mix_test32.sh` | 4 A100 nodes + 2 8-way nodes, 32 GPUs, 4x8, about 4 minutes |
+| `mix_common.sh` | shared body: builds the per-rank `run.sh`, launches `srun --het-group` |
+| `h100_mix_check.sh` | pre-flight for the H100 nodes (section 4) |
+| `dats/256GPU_mix.dat`, `dats/260GPU_mix.dat` | HPL inputs, same per-GPU memory as `240GPU_grid.dat` (74 GB), NB 448, column-major |
+| `dats/12GPU_mix_test.dat`, `dats/32GPU_mix_test.dat` | inputs for the two test scripts |
+| `dats/HPL-MxP_256GPU.dat`, `dats/HPL-MxP_260GPU.dat` | HPL-MxP inputs, repo formula, NB 2048 |
+| `dats/HPCG_256GPU.dat`, `dats/HPCG_260GPU.dat` | HPCG inputs, 256^3 local, 1800 s |
+| `alt/build_hpl_nvblas.sh` | last-resort build (section 7) |
+
+Your tracked `dats/256GPU_grid.dat` is a 32-run sweep template and was left untouched.
+
+## 3. How the hetjob works
+
+An A100 node runs 4 tasks, an 8-way H100 node runs 8. A single `sbatch` job cannot vary
+tasks per node, so each script is a Slurm heterogeneous job: component 0 is the 60 A100
+nodes, component 1 the two 8-way nodes, component 2 (260 only) the 4-way node. Every option
+after a `#SBATCH hetjob` line belongs to the next component, which is why `-p`, `-q`, `-t`
+and `--reservation` are repeated. One `srun --het-group=0-N` step spans all components, so
+MPI_COMM_WORLD has 256 or 260 ranks, numbered component by component: the H100 ranks are
+the last 16 or 20. With column-major mapping and P=16 that puts the H100s in the last
+column of the grid, which is as benign a placement as HPL offers.
+
+Component 0 carries `-w` with the A100 list on purpose: once the H100 nodes are in `hpl`,
+`--gpus-per-node=4` alone could land an A100 component on an 8-way node.
+
+The per-rank `run.sh` is generated at submit time and does three things the 240 script did
+not:
+
+- **HCA per GPU.** On a node with one active HCA every rank uses it, as before. On a node
+  with at least one HCA per GPU, each rank takes the k-th HCA on its GPU's NUMA node for the
+  k-th GPU on that node, and `NVSHMEM_HCA_PE_MAPPING` lists the whole node's mapping in GPU
+  order. `HPL_HCA_LIST="mlx5_0 mlx5_1 ..."` in the environment overrides the automatic
+  choice on every node that sees it; use it when `nvidia-smi topo -m` disagrees.
+- **IPoIB interface.** `NCCL_SOCKET_IFNAME` is the first `ib*` interface that is up, not a
+  hard-coded `ib0`.
+- **Threads.** `OMP_NUM_THREADS` follows `--cpus-per-task` of the component.
+
+Each rank prints one line starting `On node <host>:` with its GPU, HCA and PE map. Read
+those lines before reading any error.
+
+## 4. Before the first run
+
+1. H100 nodes: `scg006` and `scg020` are 8-way, `scg016` is 4-way. Both `scg016` and
+   `scg020` were drained on 13 October; resume them before the pre-flight.
+2. Run the pre-flight from the controller:
+
+       ./h100_mix_check.sh scg006 scg020 scg016
+
+   It prints, per node: GPUs with MIG state and memory, each IB device with port state, rate
+   and NUMA node, each GPU's NUMA node, the up IPoIB interfaces, whether `nvidia_peermem` is
+   loaded, whether the driver carries `PeerMappingOverride=1` (IBGDA needs it; without it
+   use `MIX_NVSHMEM=0`), core and memory counts, and `nvidia-smi topo -m`.
+3. Set `--cpus-per-task` and `--mem` in the H100 components from the core and memory counts
+   it prints. The scripts ship with 8 CPUs per task and 256000M, which fit a 64-core,
+   384 GB node and are conservative for anything larger.
+4. Put the H100 nodes in the partition and confirm they are in the reservation:
+
+       scontrol update PartitionName=hpl Nodes=sg[001-050],sdg051,sg[235-239],scg[009-012],scg006,scg020,scg016
+
+   The reservation has `ALL_NODES`, so membership follows automatically; the pre-flight
+   prints it anyway.
+5. Run `hpl_preflight.sh` as before; it covers the H100 nodes once they are in `hpl`.
+
+## 5. Validation ladder
+
+Run these in order and do not skip a rung; each one isolates something.
+
+| Step | Command | Proves |
+|---|---|---|
+| 1 | `DRY_RUN=1 bash -c 'DAT_HPL=dats/12GPU_mix_test.dat DAT_MXP=x DAT_HPCG=x source mix_common.sh'` on the login node | `run.sh` generates; shows the srun line |
+| 2 | `sbatch mix_test12.sh` | hetjob launches, 12 ranks see each other, HCA mapping on the 8-way node is sane; about 5 minutes end to end |
+| 3 | `MIX_NVSHMEM=0 sbatch mix_test12.sh` | the NCCL path works too, so you have a fallback |
+| 4 | `sbatch mix_test32.sh` | two 8-way nodes talk to each other and to four A100 nodes with IBGDA; the per-GPU rate here should be within a few percent of the 2-node A100 rate (16 TFlop/s) |
+| 5 | `sbatch 256mix.sh` | the real thing |
+| 6 | `sbatch 260mix.sh` | only after 256 produced a clean number |
+
+Reading step 4: a per-GPU rate near 16 TFlop/s means the mixed layout costs nothing and
+256 should land near 2.95 PFlop/s. A rate near 5, as in May, means the H100 ranks are
+funnelling through one NIC or NVSHMEM is falling back; check the `On node` lines for the
+H100 nodes and set `HPL_HCA_LIST` from `nvidia-smi topo -m`.
+
+## 6. Knobs
+
+| Variable | Default | Effect |
+|---|---|---|
+| `BENCH` | `hpl` | `hpl-mxp` or `hpcg` run the other benchmarks with the matching dat file |
+| `MIX_NVSHMEM` | `1` | `0` turns NVSHMEM off and nothing else, so NVSHMEM is the only variable |
+| `DAT` | per script | any input file |
+| `HPL_HCA_LIST` | unset | explicit GPU-index to HCA list, see section 3 |
+| `SIF` | `nvhpl_25.09.sif` | another container release |
+| `DRY_RUN` | `0` | `1` writes `mymix/run.sh` and prints the srun line only |
+
+`NCCL_P2P_DISABLE=1` is carried over from the 240 script. On an 8-way NVSwitch node it
+forces NCCL through host memory; if step 4 shows the H100 nodes slow while the HCA mapping
+is right, that is the next thing to flip, in `mix_common.sh`.
+
+## 7. The last resort
+
+`alt/build_hpl_nvblas.sh` builds netlib HPL 2.3 against OpenBLAS with NVIDIA's NVBLAS
+intercepting DGEMM. It runs on any CUDA GPU and needs none of the NVSHMEM, NCCL or UCX
+machinery, which makes it a clean way to prove the fabric and the hetjob layout. It is also
+3 to 5 times slower per GPU than the container, because only DGEMM is offloaded and every
+call crosses PCIe, so at 260 GPUs it lands around 1 to 1.5 PFlop/s. It cannot produce the
+submitted number. The script prints the run recipe when it finishes.
+
+## 8. Submitting a mixed system
+
+TOP500 accepts a mixed-accelerator entry. The form takes both accelerator types and counts;
+Rpeak is computed from each card's full FP64 rate, so the H100s inflate Rpeak and the
+efficiency column looks worse than the A100-only entry. That is cosmetic. Rmax is what ranks.

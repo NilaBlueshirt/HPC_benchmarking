@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -J hpcg_252mix
-#SBATCH --reservation=maint
+#SBATCH --reservation=oct2026_maint
 #SBATCH -p hpl
 #SBATCH -q public
 #SBATCH -t 0-4
