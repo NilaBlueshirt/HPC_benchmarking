@@ -34,8 +34,8 @@ Options, in the order worth trying:
 | `h100_mix_check.sh` | pre-flight for the H100 nodes (section 4) |
 | `dats/256GPU_mix.dat`, `dats/260GPU_mix.dat` | HPL inputs, same per-GPU memory as `240GPU_grid.dat` (74 GB), NB 448, column-major |
 | `dats/12GPU_mix_test.dat`, `dats/32GPU_mix_test.dat` | inputs for the two test scripts |
-| `dats/HPL-MxP_256GPU.dat`, `dats/HPL-MxP_260GPU.dat` | HPL-MxP inputs, repo formula, NB 2048 |
-| `dats/HPCG_256GPU.dat`, `dats/HPCG_260GPU.dat` | HPCG inputs, 256^3 local, 1800 s |
+| `dats/HPL-MxP_256GPU.dat`, `dats/HPL-MxP_260GPU.dat` | HPL-MxP inputs, repo formula, NB 2048; `mix_common.sh` turns N, NB, P, Q and PMAP into `hpl-mxp.sh` flags and adds `--fill-device 1` and the per-rank `--gpu-affinity`, as in `hplmxp_240A100.sh` |
+| `dats/HPCG_256GPU.dat`, `dats/HPCG_260GPU.dat` | HPCG inputs, 1800 s; 256 uses the 512x512x256 local grid of the 61.37 TF 240-A100 run, 260 is still 256^3 |
 | `alt/build_hpl_nvblas.sh` | last-resort build (section 7) |
 
 Your tracked `dats/256GPU_grid.dat` is a 32-run sweep template and was left untouched.
@@ -51,7 +51,7 @@ MPI_COMM_WORLD has 256 or 260 ranks, numbered component by component: the H100 r
 the last 16 or 20. With column-major mapping and P=16 that puts the H100s in the last
 column of the grid, which is as benign a placement as HPL offers.
 
-Component 0 carries `-w` with the A100 list on purpose: once the H100 nodes are in `hpl`,
+Component 0 carries `-w` with the A100 list on purpose: `hpl-256` holds both node types, so
 `--gpus-per-node=4` alone could land an A100 component on an 8-way node.
 
 The per-rank `run.sh` is generated at submit time and does three things the 240 script did
@@ -82,15 +82,19 @@ those lines before reading any error.
    loaded, whether the driver carries `PeerMappingOverride=1` (IBGDA needs it; without it
    use `MIX_NVSHMEM=0`), core and memory counts, and `nvidia-smi topo -m`.
 3. Set `--cpus-per-task` and `--mem` in the H100 components from the core and memory counts
-   it prints. The scripts ship with 8 CPUs per task and 256000M, which fit a 64-core,
-   384 GB node and are conservative for anything larger.
-4. Put the H100 nodes in the partition and confirm they are in the reservation:
+   it prints. The 256 scripts carry 12 CPUs per task and 256000M, set from scg006 (96 cores)
+   and scg020 (104 cores) on 2026-10-14.
+4. The 256-GPU runs use the `hpl-256` partition, created 2026-10-14 with
+   sg[001-050],sdg051,sg[235-239],scg[006,009-012,020] (62 nodes, 256 GPUs). `256mix.sh`,
+   `mix_test12.sh` and `mix_test32.sh` submit both components to it. Confirm membership with
 
-       scontrol update PartitionName=hpl Nodes=sg[001-050],sdg051,sg[235-239],scg[009-012],scg006,scg020,scg016
+       sinfo -p hpl-256 -h -o '%N'
 
-   The reservation has `ALL_NODES`, so membership follows automatically; the pre-flight
-   prints it anyway.
-5. Run `hpl_preflight.sh` as before; it covers the H100 nodes once they are in `hpl`.
+   The reservation has `ALL_NODES`, so it follows automatically. `260mix.sh` still submits to
+   `hpl`, which would need scg016 added before a 260 run.
+5. Run the pre-flight over that partition; its default is the `hpl` partition:
+
+       ./hpl_preflight.sh "$(sinfo -p hpl-256 -h -o '%N')"
 
 ## 5. Validation ladder
 
@@ -118,12 +122,13 @@ H100 nodes and set `HPL_HCA_LIST` from `nvidia-smi topo -m`.
 | `MIX_NVSHMEM` | `1` | `0` turns NVSHMEM off and nothing else, so NVSHMEM is the only variable |
 | `DAT` | per script | any input file |
 | `HPL_HCA_LIST` | unset | explicit GPU-index to HCA list, see section 3 |
-| `SIF` | `nvhpl_25.09.sif` | another container release |
+| `SIF` | `nvhpl_26.02.01.sif` | another container release; 26.02.01 produced all three 240-A100 results on 2026-10-14 |
 | `DRY_RUN` | `0` | `1` writes `mymix/run.sh` and prints the srun line only |
 
 `NCCL_P2P_DISABLE=1` is carried over from the 240 script. On an 8-way NVSwitch node it
 forces NCCL through host memory; if step 4 shows the H100 nodes slow while the HCA mapping
-is right, that is the next thing to flip, in `mix_common.sh`.
+is right, that is the next thing to flip, in `mix_common.sh`. `BENCH=hpl-mxp` already runs with it unset,
+matching the 16.15 PFlop/s 240-A100 MxP run.
 
 ## 7. The last resort
 

@@ -10,10 +10,13 @@
 #   HPL_HCA_LIST  HCA names in GPU-index order, e.g. "mlx5_0 mlx5_1 ... mlx5_7", applied on
 #                 every node that sees the variable; use it when the automatic mapping is wrong
 #   DRY_RUN=1     write run.sh and print the srun line without launching anything
+# BENCH=hpl-mxp: hpl-mxp.sh takes flags, not --dat, and refuses to start without
+# --gpu-affinity (see hplmxp_240A100.sh). N, NB, P, Q and PMAP are read from the dat file,
+# so DAT= still selects the input; --fill-device 1 and the GPU monitor flags are added.
 
 BENCH=${BENCH:-hpl}
 MIX_NVSHMEM=${MIX_NVSHMEM:-1}
-SIF=${SIF:-/packages/apps/simg/nvhpl_25.09.sif}
+SIF=${SIF:-/packages/apps/simg/nvhpl_26.02.01.sif}   # release behind all three 240-A100 results of 2026-10-14
 
 case "$BENCH" in
     hpl)     ENTRY=/workspace/hpl.sh;     DAT=${DAT:-$DAT_HPL} ;;
@@ -24,6 +27,20 @@ esac
 
 DAT_FILE=$(readlink -f "$DAT") || { echo "input file not found: $DAT" >&2; exit 2; }
 DAT_MOUNT="$(dirname "$DAT_FILE"):/my-dat-files"
+
+if [ "$BENCH" = hpl-mxp ]; then
+    MXP_N=$(awk '$2=="Ns"{print $1}' "$DAT_FILE");  MXP_NB=$(awk '$2=="NBs"{print $1}' "$DAT_FILE")
+    MXP_P=$(awk '$2=="Ps"{print $1}' "$DAT_FILE");  MXP_Q=$(awk '$2=="Qs"{print $1}' "$DAT_FILE")
+    MXP_ORDER=row; [ "$(awk '$2=="PMAP"{print $1}' "$DAT_FILE")" = 1 ] && MXP_ORDER=column
+    for v in MXP_N MXP_NB MXP_P MXP_Q; do [ -n "${!v}" ] || { echo "$v not found in $DAT_FILE (need Ns/NBs/Ps/Qs lines)" >&2; exit 2; }; done
+    # $GPU_AFF stays literal here; run.sh fills it per rank (this rank's GPU, once per local rank).
+    ENTRY_ARGS="--n $MXP_N --nb $MXP_NB --nprow $MXP_P --npcol $MXP_Q --nporder $MXP_ORDER --gpu-affinity \$GPU_AFF --fill-device 1 --monitor-gpu 1 --monitor-gpu-temp-warning 80 --monitor-gpu-clock-warning 562"
+    # The 240-A100 MxP run (16.15 PF) left NCCL_P2P_DISABLE unset: NCCL carries its panel broadcast.
+    P2P_LINE="# NCCL_P2P_DISABLE left unset for hpl-mxp"
+else
+    ENTRY_ARGS="--dat /my-dat-files/$(basename "$DAT_FILE")"
+    P2P_LINE="export NCCL_P2P_DISABLE=1"
+fi
 
 # Task count across heterogeneous components (SLURM_NTASKS covers component 0 only).
 HET=${SLURM_HET_SIZE:-1}
@@ -38,6 +55,7 @@ echo "nodes: ${SLURM_JOB_NODELIST:-?}"
 for i in $(seq 1 $((HET - 1))); do v="SLURM_JOB_NODELIST_HET_GROUP_$i"; echo "  component $i: ${!v:-?}"; done
 command -v scontrol >/dev/null && [ -n "${SLURM_JOB_ID:-}" ] && scontrol write batch_script "$SLURM_JOB_ID" - | grep -v '^ *echo '
 echo "input: $DAT_FILE"; cat "$DAT_FILE"
+[ "$BENCH" = hpl-mxp ] && echo "hpl-mxp flags: $ENTRY_ARGS"
 
 mkdir -p mymix
 cat > mymix/run.sh <<EOF
@@ -49,6 +67,7 @@ cat > mymix/run.sh <<EOF
 SYSFS=\${SYSFS:-/sys}
 GPU_N=\${SLURM_GPUS_ON_NODE:-\$(nvidia-smi -L 2>/dev/null | wc -l)}
 GPU_IDX=\${CUDA_VISIBLE_DEVICES%%,*}; GPU_IDX=\${GPU_IDX:-\${SLURM_LOCALID:-0}}
+GPU_AFF=\$GPU_IDX; for ((i = 1; i < GPU_N; i++)); do GPU_AFF+=":\$GPU_IDX"; done   # hpl-mxp --gpu-affinity
 
 gpu_numa() { b=\$(nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader -i "\$1" | tr 'A-F' 'a-f' | sed 's/^0000//'); cat "\$SYSFS/bus/pci/devices/\$b/numa_node" 2>/dev/null || echo -1; }
 hca_numa() { cat "\$SYSFS/class/infiniband/\$1/device/numa_node" 2>/dev/null || echo -1; }
@@ -106,7 +125,7 @@ export NCCL_SOCKET_IFNAME=\$IPOIB
 export NCCL_IB_GID_INDEX=0
 export NCCL_IB_PCI_RELAXED_ORDERING=1
 export NCCL_CROSS_NIC=0
-export NCCL_P2P_DISABLE=1
+$P2P_LINE
 export MONITOR_GPU=1
 export GPU_TEMP_WARNING=80
 export GPU_CLOCK_WARNING=562
@@ -117,7 +136,7 @@ if [ "$MIX_NVSHMEM" = 1 ]; then
 else
     export HPL_USE_NVSHMEM=0 HPL_NVSHMEM_SWAP=0 HPL_NVSHMEM_INIT=0
 fi
-exec $ENTRY --dat "/my-dat-files/$(basename "$DAT_FILE")"
+exec $ENTRY $ENTRY_ARGS
 EOF
 chmod +x mymix/run.sh
 SCRIPT_MOUNT="$(readlink -f mymix):/mymix"

@@ -1,4 +1,4 @@
 HPCG benchmark input file
-ASU Sol - 240 A100 + 16 H100 (two 8-way nodes) = 256 GPUs, mixed
-256 256 256
+ASU Sol - 240 A100 + 16 H100 (two 8-way nodes) = 256 GPUs, mixed; line 3 is the LOCAL grid per GPU (the 61.37 TF 240-A100 grid)
+512 512 256
 1800

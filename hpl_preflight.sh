@@ -5,6 +5,7 @@
 # an HCA resolved from ib0, port ACTIVE, no leftover xhpl process.
 #
 # Usage: ./hpl_preflight.sh ['hostlist']   default: the hpl partition's nodes
+#        ./hpl_preflight.sh "$(sinfo -p hpl-256 -h -o '%N')"   for the 256-GPU mixed runs
 
 HOSTS=${1:-$(sinfo -p hpl -h -o '%N')}
 
