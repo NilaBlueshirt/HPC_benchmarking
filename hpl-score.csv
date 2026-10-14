@@ -86,3 +86,30 @@ A100_80,240,2.5770E+06,1505280,384,15,16,"1410; 1275 for sg024,sg041,sg005",77.1
 A100_80,240,2.5540E+06,1505280,512,15,16,"1410; 1275 for sg024,sg041,sg005",NA
 A100_80,240,2.1960E+06,1555200,192,15,16,"1410; 1275 for sg024,sg041,sg005","79.74772 GiB (AVG), OOC, for warm up"
 A100_80,240,7.2370E+05,1555200,384,15,16,"1410; 1275 for sg024,sg041,sg005","NA, cut off, OOC"
+A100_80,220,2.55000E+06,59.40%,"1,514,240",192,,,,,,,dell binary
+A100_80,240,2.62000E+06,,1490048,448,15,16,,"1410; 1275 for sg024,sg041,sg005",,no,most recent submission
+A100_80,16,2.35400E+05,,,,,,,"1410; 1275 for sg024,sg041,sg005",HPL-16GPUs.dat,no,"disable nvshmem, v26.02"
+A100_80,16,2.52800E+05,,,,,,,"1410; 1275 for sg024,sg041,sg005",HPL-16GPUs.dat,no,"disable nvshmem, v26.02, remove NCCL_P2P_DISABLE=1"
+A100_80,16,2.55100E+05,,,,,,,"1410; 1275 for sg024,sg041,sg005",HPL-16GPUs.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.23200E+06,,1439872,448,14,16,,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"this is a warm-up run, disable nvshmem, v26.02, remove NCCL_P2P_DISABLE=1"
+A100_80,224,2.55200E+06,,1439872,448,14,16,,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"this is a warm-up run, use nvshmem, sdk binary"
+A100_80,224,2.55400E+06,,1439872,448,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"this is a warm-up run, use nvshmem, sdk binary"
+A100_80,224,2.58100E+06,,1439616,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.57500E+06,,1439616,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.58100E+06,,1439616,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.54600E+06,,1439872,448,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.54000E+06,,1439872,448,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.48400E+06,,1439744,512,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.60900E+06,,1487616,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"this is a warm-up run, use nvshmem, sdk binary"
+A100_80,224,2.61000E+06,,1487616,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.60700E+06,,1487616,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,not accepted params,,1482624,416,,,,,,,
+A100_80,224,not accepted params,,1482624,352,,,,,,,
+A100_80,224,2.59000E+06,,1482624,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.58800E+06,,1482624,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.59400E+06,,1482624,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.60500E+06,,1482560,320,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,2.61700E+06,,1487616,384,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"this is a warm-up run, use nvshmem, sdk binary"
+A100_80,224,2.61700E+06,,1487360,320,14,16,WC0,"1410; 1275 for sg024,sg041,sg005",224_grid.dat,no,"use nvshmem, sdk binary"
+A100_80,224,not accepted params,,1487616,416,,,,,,,
+A100_80,224,not accepted params,,1487616,352,,,,,,,
