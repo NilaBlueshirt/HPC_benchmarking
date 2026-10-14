@@ -32,7 +32,7 @@ Options, in the order worth trying:
 | `mix_test32.sh` | 4 A100 nodes + 2 8-way nodes, 32 GPUs, 4x8, about 4 minutes |
 | `mix_common.sh` | shared body: builds the per-rank `run.sh`, launches `srun --het-group` |
 | `h100_mix_check.sh` | pre-flight for the H100 nodes (section 4) |
-| `dats/256GPU_mix.dat`, `dats/260GPU_mix.dat` | HPL inputs, same per-GPU memory as `240GPU_grid.dat` (74 GB), NB 448, column-major |
+| `dats/256GPU_mix.dat`, `dats/260GPU_mix.dat` | HPL inputs, 74 GB per GPU (86% fill; the 240 dat's first N fills 92.7%), NB 448, column-major, and the single algorithm line of `HPL_240GPU.dat` (PFACT 0, NBMIN 2, NDIV 2, RFACT 0, BCAST 3, DEPTH 1). The 72-run sweep they shipped with lives on as `dats/256GPU_mix_sweep.dat` (`DAT=dats/256GPU_mix_sweep.dat sbatch 256mix.sh`) |
 | `dats/12GPU_mix_test.dat`, `dats/32GPU_mix_test.dat` | inputs for the two test scripts |
 | `dats/HPL-MxP_256GPU.dat`, `dats/HPL-MxP_260GPU.dat` | HPL-MxP inputs, repo formula, NB 2048; `mix_common.sh` turns N, NB, P, Q and PMAP into `hpl-mxp.sh` flags and adds `--fill-device 1` and the per-rank `--gpu-affinity`, as in `hplmxp_240A100.sh` |
 | `dats/HPCG_256GPU.dat`, `dats/HPCG_260GPU.dat` | HPCG inputs, 1800 s; 256 uses the 512x512x256 local grid of the 61.37 TF 240-A100 run, 260 is still 256^3 |
@@ -46,7 +46,9 @@ An A100 node runs 4 tasks, an 8-way H100 node runs 8. A single `sbatch` job cann
 tasks per node, so each script is a Slurm heterogeneous job: component 0 is the 60 A100
 nodes, component 1 the two 8-way nodes, component 2 (260 only) the 4-way node. Every option
 after a `#SBATCH hetjob` line belongs to the next component, which is why `-p`, `-q`, `-t`
-and `--reservation` are repeated. One `srun --het-group=0-N` step spans all components, so
+and `--reservation` are repeated. One `srun` with a colon-separated section per component
+(`--het-group=0 -N 60 -n 240 ... : --het-group=1 -N 2 -n 16 ...`, geometry read from
+`scontrol show job` for each component) creates one step spanning all components, so
 MPI_COMM_WORLD has 256 or 260 ranks, numbered component by component: the H100 ranks are
 the last 16 or 20. With column-major mapping and P=16 that puts the H100s in the last
 column of the grid, which is as benign a placement as HPL offers.
@@ -65,6 +67,12 @@ not:
 - **IPoIB interface.** `NCCL_SOCKET_IFNAME` is the first `ib*` interface that is up, not a
   hard-coded `ib0`.
 - **Threads.** `OMP_NUM_THREADS` follows `--cpus-per-task` of the component.
+
+The batch environment holds component 0's `SLURM_NTASKS`, `SLURM_GPUS_PER_NODE` and
+`SLURM_MEM_PER_NODE`, and srun would apply them to every section; `mix_common.sh` unsets them
+and states `-N`, `-n`, `--ntasks-per-node` and `-c` per section. That is what the first 256
+run on 2026-10-14 tripped over ("requested tasks 240 with the maximum number of requested
+nodes 2").
 
 Each rank prints one line starting `On node <host>:` with its GPU, HCA and PE map. Read
 those lines before reading any error.

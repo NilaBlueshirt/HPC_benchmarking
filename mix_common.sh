@@ -42,11 +42,26 @@ else
     P2P_LINE="export NCCL_P2P_DISABLE=1"
 fi
 
-# Task count across heterogeneous components (SLURM_NTASKS covers component 0 only).
+# Step geometry per heterogeneous component, read from the controller. The batch environment
+# carries component 0's SLURM_NTASKS (240), SLURM_GPUS_PER_NODE (4) and SLURM_MEM_PER_NODE,
+# and srun applies them to every component unless each section states its own: the first
+# 256 run died with "can't honor --ntasks-per-node set to 8 ... requested tasks 240".
 HET=${SLURM_HET_SIZE:-1}
-TOTAL=0
-for i in $(seq 0 $((HET - 1))); do v="SLURM_NTASKS_HET_GROUP_$i"; TOTAL=$((TOTAL + ${!v:-0})); done
-[ "$HET" -eq 1 ] && TOTAL=${SLURM_NTASKS:-0}
+HET_NODES=(); HET_TASKS=(); HET_CPT=(); TOTAL=0
+if [ "$HET" -gt 1 ]; then
+    for i in $(seq 0 $((HET - 1))); do
+        jv="SLURM_JOB_ID_HET_GROUP_$i"; rec=$(scontrol -o show job "${!jv:-}" 2>/dev/null)
+        nodes=$(grep -o 'NumNodes=[0-9]*' <<<"$rec" | head -1 | cut -d= -f2)
+        n=$(grep -o 'NumTasks=[0-9]*' <<<"$rec" | head -1 | cut -d= -f2)
+        tpn=$(grep -o 'NtasksPerN:B:S:C=[0-9]*' <<<"$rec" | head -1 | cut -d= -f2)
+        cpt=$(grep -o 'CPUs/Task=[0-9]*' <<<"$rec" | head -1 | cut -d= -f2)
+        [ -z "$n" ] && [ -n "$nodes" ] && [ -n "$tpn" ] && n=$((nodes * tpn))
+        [ -n "$nodes" ] && [ -n "$n" ] || { echo "component $i (job ${!jv:-?}): cannot read NumNodes/NumTasks from scontrol" >&2; exit 2; }
+        HET_NODES[$i]=$nodes; HET_TASKS[$i]=$n; HET_CPT[$i]=${cpt:-${SLURM_CPUS_PER_TASK:-12}}; TOTAL=$((TOTAL + n))
+    done
+else
+    TOTAL=${SLURM_NTASKS:-0}
+fi
 
 echo "==============================================================================="
 echo "---------------- ${BENCH} mixed run start $(date) ------------------"
@@ -141,8 +156,20 @@ EOF
 chmod +x mymix/run.sh
 SCRIPT_MOUNT="$(readlink -f mymix):/mymix"
 
-HETOPT=""; [ "$HET" -gt 1 ] && HETOPT="--het-group=0-$((HET - 1))"
-SRUN="srun $HETOPT --mpi=pmix --export=ALL apptainer run --nv -B $DAT_MOUNT -B $SCRIPT_MOUNT $SIF /mymix/run.sh"
+CMD="apptainer run --nv -B $DAT_MOUNT -B $SCRIPT_MOUNT $SIF /mymix/run.sh"
+if [ "$HET" -gt 1 ]; then
+    # One srun, one colon-separated section per component, each with its own -N/-n/-c.
+    # Component 0's values are dropped from the environment so they cannot become defaults.
+    unset SLURM_NTASKS SLURM_NPROCS SLURM_NTASKS_PER_NODE SLURM_NNODES SLURM_JOB_NUM_NODES \
+          SLURM_GPUS_PER_NODE SLURM_MEM_PER_NODE SLURM_MEM_PER_CPU SLURM_CPUS_PER_TASK SRUN_CPUS_PER_TASK
+    SRUN="srun"
+    for i in $(seq 0 $((HET - 1))); do
+        [ "$i" -gt 0 ] && SRUN+=" :"
+        SRUN+=" --het-group=$i --mpi=pmix --export=ALL -N ${HET_NODES[$i]} -n ${HET_TASKS[$i]} --ntasks-per-node=$((HET_TASKS[$i] / HET_NODES[$i])) -c ${HET_CPT[$i]} $CMD"
+    done
+else
+    SRUN="srun --mpi=pmix --export=ALL${SLURM_NTASKS:+ -n $SLURM_NTASKS} $CMD"
+fi
 if [ "${DRY_RUN:-0}" = 1 ]; then
     echo "--- DRY_RUN: mymix/run.sh ---"; cat mymix/run.sh; echo "--- srun ---"; echo "$SRUN"; exit 0
 fi
