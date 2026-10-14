@@ -19,7 +19,7 @@
 #SBATCH --gpus-per-node=4
 #SBATCH --gpu-bind=single:1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=512000M
+#SBATCH --mem=0
 #SBATCH --distribution=block:block
 #SBATCH hetjob
 #SBATCH -t 0-4
@@ -33,7 +33,7 @@
 #SBATCH --gpus-per-node=8
 #SBATCH --gpu-bind=single:1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=256000M
+#SBATCH --mem=0
 #SBATCH --distribution=block:block
 DAT_HPL=./dats/256GPU_mix.dat
 DAT_MXP=./dats/HPL-MxP_256GPU.dat
