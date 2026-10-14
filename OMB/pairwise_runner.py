@@ -45,7 +45,7 @@ def generate_job_script(i, pair, omb_name, mpi_cmd, sanitized_omb_name):
     # Create job script content
     job_script = f"""#!/bin/bash
 #SBATCH --job-name=bibw_{omb_name}_{node1}_{node2}
-#SBATCH --reservation=maint
+#SBATCH --reservation=oct2026_maint
 #SBATCH -p htc
 #SBATCH -q public
 #SBATCH -t 1
