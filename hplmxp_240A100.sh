@@ -73,8 +73,10 @@ export NCCL_CROSS_NIC=0
 # NCCL_P2P_DISABLE is intentionally not set: HPL-MxP's panel broadcast runs on NCCL,
 # and the 16-GPU HPL test gained 7% when it was removed from the NCCL path.
 
-# --gpu-affinity 0:0:0:0 because --gpu-bind=single:1 makes each rank see its GPU as device 0.
-/workspace/hpl-mxp.sh --n $N --nb $NB --nprow $NPROW --npcol $NPCOL --nporder $NPORDER --gpu-affinity 0:0:0:0 --fill-device 1 --monitor-gpu 1 --monitor-gpu-temp-warning 80 --monitor-gpu-clock-warning 562
+# No --gpu-affinity: the wrapper implements it by exporting CUDA_VISIBLE_DEVICES, which
+# overwrote the per-rank value Slurm sets (3,1,2,0 on Sol) and put all 4 ranks on GPU 0
+# (hung 3+ h on 2026-10-14). hpl.sh in 240A100.sh runs without it for the same reason.
+/workspace/hpl-mxp.sh --n $N --nb $NB --nprow $NPROW --npcol $NPCOL --nporder $NPORDER --fill-device 1 --monitor-gpu 1 --monitor-gpu-temp-warning 80 --monitor-gpu-clock-warning 562
 EOS
 SCRIPT_FILE=$(readlink -f ./myhplmxp/run.sh)
 SCRIPT_MOUNT="$(dirname "$SCRIPT_FILE"):/myhplmxp"

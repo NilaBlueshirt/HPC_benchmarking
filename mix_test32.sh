@@ -9,7 +9,7 @@
 #SBATCH --open-mode=append
 #SBATCH --export=NONE
 #SBATCH -t 0-1
-#SBATCH -p hpl
+#SBATCH -p hpl-256
 #SBATCH -q public
 #SBATCH --reservation=oct2026_maint
 #SBATCH -N 4-4
@@ -23,7 +23,7 @@
 #SBATCH --distribution=block:block
 #SBATCH hetjob
 #SBATCH -t 0-1
-#SBATCH -p hpl
+#SBATCH -p hpl-256
 #SBATCH -q public
 #SBATCH --reservation=oct2026_maint
 #SBATCH -N 2-2
@@ -32,7 +32,7 @@
 #SBATCH --gpus-per-task=1
 #SBATCH --gpus-per-node=8
 #SBATCH --gpu-bind=single:1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=12
 #SBATCH --mem=256000M
 #SBATCH --distribution=block:block
 DAT_HPL=./dats/32GPU_mix_test.dat
