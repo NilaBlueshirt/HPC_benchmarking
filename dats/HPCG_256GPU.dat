@@ -1,0 +1,4 @@
+HPCG benchmark input file
+ASU Sol - 240 A100 + 16 H100 (two 8-way nodes) = 256 GPUs, mixed
+256 256 256
+1800

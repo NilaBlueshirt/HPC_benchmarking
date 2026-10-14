@@ -1,0 +1,11 @@
+HPL-MxP.out  output file name (if any)
+6            device out (6=stdout,7=stderr,file)
+1            # of problem sizes (N)
+1546240      Ns         (240 A100 + 20 H100 (two 8-way + one 4-way) = 260 GPUs, mixed; sqrt(0.92 * 260 * 80GB / 8B) rounded down to NB multiple)
+1            # of NBs
+2048         NBs        (tensor-core sweet spot for MxP)
+0            PMAP process mapping (0=Row-,1=Column-major)
+1            # of process grids (P x Q)
+13           Ps
+20           Qs
+50           niter      (max iterative-refinement iterations)
