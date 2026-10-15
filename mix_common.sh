@@ -96,7 +96,8 @@ if [ -n "\${HPL_HCA_LIST:-}" ]; then MAP=(\$HPL_HCA_LIST); HCA=\${MAP[\$GPU_IDX]
 else for i in \$(seq 1 "\$GPU_N"); do MAP+=("\$HCA"); done; fi
 PE_MAP=\$(printf '%s:1,' "\${MAP[@]}"); PE_MAP=\${PE_MAP%,}
 
-echo "On node \$(hostname): rank=\${PMIX_RANK:-\${SLURM_PROCID:-?}} local=\${SLURM_LOCALID:-?} gpu=\$GPU_IDX gpus_on_node=\$GPU_N hca=\$HCA pe_map=\$PE_MAP ipoib=\$IPOIB nvshmem=$MIX_NVSHMEM"
+BUS=\$(nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader 2>/dev/null | head -1)   # which physical GPU this rank got
+echo "On node \$(hostname): rank=\${PMIX_RANK:-\${SLURM_PROCID:-?}} local=\${SLURM_LOCALID:-?} gpu=\$GPU_IDX gpus_on_node=\$GPU_N hca=\$HCA bus=\$BUS pe_map=\$PE_MAP ipoib=\$IPOIB nvshmem=$MIX_NVSHMEM"
 
 export OMP_NUM_THREADS=\${SLURM_CPUS_PER_TASK:-12}
 export OMP_PROC_BIND=close
