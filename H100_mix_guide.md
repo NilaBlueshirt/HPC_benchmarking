@@ -18,6 +18,15 @@ and the one layout that can still be tried. Written for the Sol admin.
   device named mlx5_0 is the Ethernet port, which the mlx5 driver also lists under
   `/sys/class/infiniband` with its port ACTIVE. The mixed script used to take the first ACTIVE
   device; it now takes the device behind the up IPoIB interface, exactly as `240A100.sh` does.
+- **HPL-NVIDIA 26.02.01 aborts on mixed GPU models.** The 248-GPU run (plain job, 4 PEs on every
+  node) got past MPI, the HCA and NVSHMEM's PE check, printed its device info, and then died in
+  `MPI_Allgather` on a copy of the world communicator with `MPI_ERR_TRUNCATE: message truncated`.
+  Every rank that reported it was an A100 rank, so the H100 ranks sent more bytes than the A100
+  ranks had room for: a per-rank size that depends on the GPU model (the H100 has 132 SMs to the
+  A100's 108). No environment variable controls that exchange. The only lever is the container
+  release: the May mixed pairs ran at full speed on an earlier release than 26.02.01.
+- **Slurm orders the nodes by name.** In the plain 248 job scg006 came first, so rank 0 was an
+  H100 and the H100 ranks were 0 to 3 and 20 to 23, not the last process column.
 - **The heterogeneous job itself worked.** With the HCA fixed, the 256 ranks came up as one MPI
   world and reached NVSHMEM init. The hetjob mechanics are not the problem.
 - **Only 4 GPUs per node mixes.** That gives 252 with scg016 (14x18 grid) or 248 without it
@@ -58,9 +67,9 @@ On scg006 and scg020 Slurm picks 4 of the 8 GPUs. Which ones matters, because GP
 the NIC's NUMA node and GPUs 0-3 do not. Each rank prints one `On node` line with its HCA and the
 PCI bus id of the GPU it got; read the 8 lines from the H100 nodes before reading anything else.
 
-Column-major with P=8 puts the 8 H100 ranks (240 to 247) in the last process column, so their
-panel factorizations and row swaps stay among themselves, and the only mixed traffic is the panel
-broadcast along rows.
+Slurm numbers the ranks in node-name order, and `scg006` sorts before `sg001`, so the H100 ranks
+are 0 to 3 (scg006) and 20 to 23 (scg020): column 0 rows 0 to 3 and column 2 rows 4 to 7 of the
+8x31 grid, not a column of their own.
 
 ## 4. Before the run
 
