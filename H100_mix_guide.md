@@ -59,11 +59,11 @@ Component 0 carries `-w` with the A100 list on purpose: `hpl-256` holds both nod
 The per-rank `run.sh` is generated at submit time and does three things the 240 script did
 not:
 
-- **HCA per GPU.** On a node with one active HCA every rank uses it, as before. On a node
-  with at least one HCA per GPU, each rank takes the k-th HCA on its GPU's NUMA node for the
-  k-th GPU on that node, and `NVSHMEM_HCA_PE_MAPPING` lists the whole node's mapping in GPU
-  order. `HPL_HCA_LIST="mlx5_0 mlx5_1 ..."` in the environment overrides the automatic
-  choice on every node that sees it; use it when `nvidia-smi topo -m` disagrees.
+- **HCA.** Every rank on a node uses the HCA behind the up IPoIB interface, exactly as
+  `240A100.sh` does. The first 256 run (2026-10-14) died because the script then took the first
+  ACTIVE device under `/sys/class/infiniband`, which on five A100 nodes is the Ethernet port
+  (`link layers differ RoCE (local) vs IB (remote)`). `HPL_HCA_LIST="mlx5_0 mlx5_1 ..."` in
+  the environment overrides the choice per GPU index on every node that sees it.
 - **IPoIB interface.** `NCCL_SOCKET_IFNAME` is the first `ib*` interface that is up, not a
   hard-coded `ib0`.
 - **Threads.** `OMP_NUM_THREADS` follows `--cpus-per-task` of the component.
